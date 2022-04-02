@@ -1,6 +1,14 @@
-#include "FSM.h"
+/*******************************************************************************
+ * @file    Tfsm.cpp
+ * @author  Kostas Markostamos
+ * @date    31/03/2022
+ * 
+ * TODO:    - Add comments to constructor and methods
+ *******************************************************************************/
 
-FSM::FSM(ST_STATE pStates[], size_t n)
+#include "Tfsm.h"
+
+TFSM::TFSM(ST_STATE pStates[], size_t n)
 {
   if (this->_pStates != NULL)
     free(_pStates);
@@ -9,15 +17,10 @@ FSM::FSM(ST_STATE pStates[], size_t n)
   this->_size = _n * sizeof(ST_STATE);
   this->_pStates = (ST_STATE *) malloc(_size);
   memcpy(_pStates, pStates, _size);
-  for (uint16_t i = 0; i < this->_n; ++i)
-  {
-    if (this->_pStates[i].cycle > 7000)
-      this->_pStates[i].cycle = 7000;
-  }
   this->init();
 }
 
-FSM::~FSM()
+TFSM::~TFSM()
 {
   if (this->_pStates != NULL)
     free(this->_pStates);
@@ -27,19 +30,19 @@ FSM::~FSM()
   this->_alt_transition = false;
 }
 
-void FSM::init(void)
+void TFSM::init(void)
 {
   this->_state = this->_pStates[0];
   this->_alt_transition = false;
 }
 
-void FSM::init(ST_STATE state)
+void TFSM::init(ST_STATE state)
 {
   this->_state = state;
   this->_alt_transition = false;
 }
 
-void FSM::run(void)
+void TFSM::run(void)
 {
   if (this->_state.steps > 0)
   {
@@ -73,17 +76,17 @@ void FSM::run(void)
   }
 }
 
-uint32_t FSM::get_current_cycle(void)
+uint32_t TFSM::get_current_cycle(void)
 {
   return this->_state.cycle;
 }
 
-int16_t FSM::get_current_steps(void)
+int16_t TFSM::get_current_steps(void)
 {
   return this->_state.steps;
 }
 
-void FSM::set_alt_transition(void)
+void TFSM::set_alt_transition(void)
 {
   this->_alt_transition = true;
 }

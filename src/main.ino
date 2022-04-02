@@ -1,16 +1,45 @@
-/* Includes */
+/********************************************************************************
+ * @file    main.ino
+ * @author  Kostas Markostamos
+ * @date    31/03/2022
+ * @brief   Main Arduino program file.
+ *          Declares MQ3, TFSM and LiquidCrystal_I2C instances.
+ *          Declares the states of the TFSM of the MQ3 sensor.
+ *          Defines and declares the state action and delay callbacks of the MQ3
+ *          sensor.
+ *          Serial print at every state and delayed transition for internal
+ *          info.
+ *          LCD display at every state and delayed transition for user info.
+ *          Program loop checks if cycle time of the TFSM elapsed and runs its
+ *          current state action.
+ *          Information about the project will be written in the README.
+ * 
+ *          TODO: - Finish LCD display process for most states.
+ *                - Comment state action functions.
+ *                - Eventually keep only core programm process in main file and
+ *                  move the rest in appropriate header, source files.
+********************************************************************************/
+
+
+/**************************************
+ * Includes
+ **************************************/
 #include <Arduino.h>
 #include <Wire.h>
 #include <avr/wdt.h>
 #include <LiquidCrystal_I2C.h>
 #include <EEPROM.h>
-#include "FSM.h"
-#include "mq3.h"
+#include <Tfsm.h>
+#include <Mq3.h>
 
-/* Defines */
+/**************************************
+ * Defines
+ **************************************/
 #define EEPROM_VALID_CONFIG ((byte)'C')
 
-/* Typedefs */
+/**************************************
+ * Typedefs
+ **************************************/
 typedef enum {
   STATE_INIT_WARMUP = 0,
   STATE_RUN_WARMUP,
@@ -21,7 +50,9 @@ typedef enum {
   STATE_RESET,
 } E_STATE;
 
-/* Function forward declarations */
+/**************************************
+ * State action functions prototypes
+ **************************************/
 void delay_cb(void);
 void state_initWarmUp(void);
 void state_runWarmUp(void);
@@ -31,8 +62,10 @@ void state_verify(void);
 void state_main(void);
 void state_reset(void);
 
-/* Variables */
-FSM::ST_STATE state_table[] = { // cycle, steps, delay, primary_transition, alternate_transition, action, delay_cb
+/**************************************
+ * Variables
+ **************************************/
+TFSM::ST_STATE state_table[] = { // cycle, steps, delay, primary_transition, alternate_transition, action, delay_cb
   // STATE_INIT_WARMUP
   {0, 1, 0, STATE_RUN_WARMUP, STATE_RESET, state_initWarmUp, NULL},
   // STATE_RUN_WARMUP
@@ -50,17 +83,17 @@ FSM::ST_STATE state_table[] = { // cycle, steps, delay, primary_transition, alte
 };
 uint32_t time = 0;
 
-/* Objects */
+/**************************************
+ * Objects
+ **************************************/
 LiquidCrystal_I2C display(0x27, 20, 4);
-FSM Fsm(state_table, sizeof(state_table) / sizeof(FSM::ST_STATE));
+TFSM Fsm(state_table, sizeof(state_table) / sizeof(TFSM::ST_STATE));
 MQ3 Mq3(A3);
 
 
-/*************************/
-/* Functions */
-/*************************/
-
-/* State functions */
+/***************************/
+/* State actions Functions */
+/***************************/
 
 void delay_cb(void)
 {
@@ -184,7 +217,9 @@ void state_reset(void)
 }
 
 
-/* Arduino system execution functions */
+/**************************************
+ * System functions
+ **************************************/
 
 void setup(void)
 {

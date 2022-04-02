@@ -1,5 +1,13 @@
+/*******************************************************************************
+ * @file    Mq3.cpp
+ * @author  Kostas Markostamos
+ * @date    31/03/2022
+ * 
+ * TODO:    - Add comments to constructor and methods
+ *******************************************************************************/
+
 #include <Arduino.h>
-#include "mq3.h"
+#include "Mq3.h"
 
 MQ3::MQ3(uint8_t ain_pin)
 {
