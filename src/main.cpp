@@ -14,8 +14,7 @@
  *          current state action.
  *          Information about the project will be written in the README.
  * 
- *          TODO: - Finish LCD display process for most states.
- *                - Comment state action functions.
+ *          TODO: - Comment state action functions.
  *                - Eventually keep only core programm process in main file and
  *                  move the rest in appropriate header, source files.
 ********************************************************************************/
@@ -73,7 +72,7 @@ TFSM::ST_STATE state_table[] = { // cycle, steps, delay, primary_transition, alt
   // STATE_CONFIG
   {1000, 1, 4, STATE_MAIN, STATE_CALIBRATE, state_config, delay_cb},
   // STATE_CALIBRATE
-  {1000, 200, 1, STATE_VERIFY, STATE_RESET, state_calibrate, NULL},
+  {1000, 200, 1, STATE_VERIFY, STATE_RESET, state_calibrate, delay_cb},
   // STATE_VERIFY
   {1000, 1, 1, STATE_MAIN, STATE_INIT_WARMUP, state_verify, delay_cb},
   // STATE_MAIN
@@ -140,26 +139,39 @@ void state_config(void)
   if (EEPROM.read(0) == EEPROM_VALID_CONFIG)
   {
     EEPROM.get(1, Mq3.R0);
+
     Serial.print(String(millis()/1000) + "  |  ");
     Serial.println("Loaded Configuration  |  [R0 = " + String(Mq3.R0, 2) + "]");
+
+    display.setCursor(1,0);
+    display.print("Loaded Config.");
+    display.setCursor(2,1);
+    display.print("R0 = " + String(Mq3.R0, 2));
   }
   else
   {
     Mq3.clear_calibration();
+
     Serial.print(String(millis()/1000) + "  |  ");
     Serial.println("No configuration found");
+
+    display.setCursor(0,0);
+    display.print("No Config. found");
+
     Fsm.set_alt_transition();
   }
 }
 
 void state_calibrate(void)
 {
+  const char msg[] = "Calibrating... Keep MQ3 in clean air!";
+  const uint8_t id = (200 - Fsm.get_current_steps()) % 16;
   float val, volts, r0;
 
   Mq3.calibrate(val, volts, r0);
 
   Serial.print(String(millis()/1000) + "  |  ");
-  Serial.println("Calibrating... Keep MQ3 in clean air!");
+  Serial.println(msg);
   Serial.print("Sensor value = ");
   Serial.print(val);
   Serial.print("  |  ");
@@ -167,6 +179,11 @@ void state_calibrate(void)
   Serial.print(volts);
   Serial.print("V  |  calib R0 = ");
   Serial.println(r0);
+
+  display.setCursor(0,0);
+  display.print(&msg[id]);
+  display.setCursor(2,1);
+  display.print("R0 = " + String(r0, 2));
 }
 
 void state_verify(void)
@@ -179,13 +196,25 @@ void state_verify(void)
   {
     EEPROM.write(0, EEPROM_VALID_CONFIG);
     EEPROM.put(1, Mq3.R0);
+
     Serial.print("Calibrated " + String(precision, 2) + "%  |  ");
     Serial.println("[R0 = " + String(Mq3.R0, 2) + "]");
+
+    display.setCursor(0,0);
+    display.print("Calibrated " + String(precision, 1) + "%");
+    display.setCursor(0,2);
+    display.print("R0 = " + String(Mq3.R0, 2));
   }
   else
   {
     Serial.println("Error too high!");
     Serial.println("Error: " + String(precision, 2) + "%");
+
+    display.setCursor(0,0);
+    display.print("Error too high!");
+    display.setCursor(2,1);
+    display.println("Error: " + String(precision, 2) + "%");
+
     Fsm.set_alt_transition();
   }
 }
@@ -198,6 +227,7 @@ void state_main(void)
 
   const float mgL = pow(0.4 * ratio, -1.431);
   const float gdL = mgL * 0.0001;
+  String str;
 
   Serial.print(String(millis()/1000) + "  |  ");
   Serial.print("Sensor value = ");
@@ -208,12 +238,28 @@ void state_main(void)
   Serial.print(mgL);
   Serial.print("  |  ppm = ");
   Serial.println(gdL);
+
+  str = String(mgL, 2);
+  display.setCursor(9 - str.length(), 0);
+  display.print(str);
+  display.setCursor(9, 0);
+  display.print("mg/L");
+  str = String(gdL, 2);
+  display.setCursor(9 - str.length(), 0);
+  display.print(str);
+  display.setCursor(9, 0);
+  display.print("ppm");
 }
 
 void state_reset(void)
 {
   Serial.print(String(millis()/1000) + "  |  ");
   Serial.println("Unexpected error occured, resetting when watchdog expires...");
+
+  display.setCursor(0,0);
+  display.print("Unexpected error");
+  display.setCursor(2,1);
+  display.print("Resetting...");
 }
 
 
