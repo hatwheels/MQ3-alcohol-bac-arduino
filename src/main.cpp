@@ -76,7 +76,7 @@ TFSM::ST_STATE state_table[] = { // cycle, steps, delay, primary_transition, alt
   // STATE_CALIBRATE
   {1000, CALIBRATION_STEPS, 1, STATE_VERIFY, STATE_RESET, state_calibrate, delay_cb},
   // STATE_VERIFY
-  {1000, 1, 1, STATE_MAIN, STATE_INIT_WARMUP, state_verify, delay_cb},
+  {1000, 1, 1, STATE_MAIN, STATE_CONFIG, state_verify, delay_cb},
   // STATE_MAIN
   {1000, 1, 0, STATE_MAIN, STATE_RESET, state_main, NULL},
   // STATE_RESET
@@ -155,8 +155,6 @@ void state_config(void)
   }
   else
   {
-    Mq3.clear_calibration();
-
     Serial.print(String(millis()/1000) + "  |  ");
     Serial.println("No configuration found");
 
@@ -165,6 +163,7 @@ void state_config(void)
 
     Fsm.set_alt_transition();
   }
+  Mq3.clear_calibration();
 }
 
 void state_calibrate(void)
@@ -210,7 +209,6 @@ void state_calibrate(void)
   sprintf(&str_buf[9], "%3d/200", step);
   display.setCursor(0,1);
   display.print(str_buf);
-
 }
 
 void state_verify(void)
@@ -232,6 +230,8 @@ void state_verify(void)
     display.print("Calibrated " + String(precision, 1) + "%");
     display.setCursor(0,1);
     display.print("R0: " + String(Mq3.R0, 2));
+
+    Mq3.clear_calibration();
   }
   else
   {

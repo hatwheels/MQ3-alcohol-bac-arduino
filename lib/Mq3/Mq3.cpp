@@ -22,6 +22,8 @@ MQ3::~MQ3()
 
   this->clear_calibration();
 
+  this->_calib.precision = FLT_MAX;
+
   this->R0 = 0;
 }
 
@@ -122,5 +124,4 @@ void MQ3::clear_calibration(void)
     free(this->_calib.pAvalues);
   }
   this->_calib.n = 0;
-  this->_calib.precision = FLT_MAX;
 }
