@@ -62,9 +62,9 @@ void MQ3::calibrate(void)
 
   this->_calib.n++;
   if (this->_calib.pAvalues == NULL)
-    this->_calib.pAvalues = (float *) malloc(this->_calib.n);
+    this->_calib.pAvalues = (float *) malloc(sizeof(float) * this->_calib.n);
   else
-    this->_calib.pAvalues = (float *) realloc(this->_calib.pAvalues, this->_calib.n);
+    this->_calib.pAvalues = (float *) realloc(this->_calib.pAvalues, sizeof(float) * this->_calib.n);
   this->_calib.pAvalues[this->_calib.n - 1] = R0;
 }
 
@@ -118,7 +118,7 @@ void MQ3::clear_calibration(void)
 {
   if (this->_calib.pAvalues != NULL)
   {
-    memset(this->_calib.pAvalues, 0, this->_calib.n);
+    memset(this->_calib.pAvalues, 0, sizeof(float) * this->_calib.n);
     free(this->_calib.pAvalues);
   }
   this->_calib.n = 0;
