@@ -35,8 +35,9 @@
  * Defines
  **************************************/
 #define EEPROM_VALID_CONFIG ((byte)'C')
-#define WARMUP_PERIOD_SEC (60*60-1)
+#define WARMUP_PERIOD_SEC (60*60)
 #define CALIBRATION_STEPS 200
+#define DYNAMIC_CONFIG 0
 
 /**************************************
  * Typedefs
@@ -116,7 +117,7 @@ void state_runWarmUp(void)
 {
   const int16_t timer = Fsm.get_current_steps() - 1;
   const unsigned int seconds = timer % 60;
-  const unsigned int minutes = ((timer - seconds) / 60) % 60;
+  const unsigned int minutes = ((timer - seconds) / 60);
   char str_minutes[7] = {'\0'};
   char str_seconds[3] = {'\0'};
 
@@ -143,10 +144,10 @@ void state_config(void)
     float precision;
 
     EEPROM.get(1, Mq3.R0);
-    EEPROM.get(2, precision);
+    EEPROM.get(1 + sizeof(Mq3.R0), precision);
 
     Serial.print(String(millis()/1000) + "  |  ");
-    Serial.println("Loaded Configuration  |  [R0 = " + String(Mq3.R0, 2) + "] with precsion " + String(precision, 2));
+    Serial.println("Loaded Configuration  |  [R0 = " + String(Mq3.R0, 2) + "] with precision " + String(precision, 2));
 
     display.setCursor(1,0);
     display.print("Loaded Config.");
@@ -155,6 +156,7 @@ void state_config(void)
   }
   else
   {
+#if DYNAMIC_CONFIG
     Serial.print(String(millis()/1000) + "  |  ");
     Serial.println("No configuration found");
 
@@ -162,6 +164,20 @@ void state_config(void)
     display.print("No config. found");
 
     Fsm.set_alt_transition();
+#else
+    Mq3.R0 = 180.0;
+
+    EEPROM.write(0, EEPROM_VALID_CONFIG);
+    EEPROM.put(1, Mq3.R0);
+    EEPROM.put(1 + sizeof(Mq3.R0), 0.0f);
+
+    Serial.print(String(millis()/1000) + "  |  ");
+    Serial.println("Set static configuration  | [R0 = " + String(Mq3.R0, 2) + "]");
+    display.setCursor(2,0);
+    display.print("Set config.:");
+    display.setCursor(4,1);
+    display.print("R0: " + String(round(Mq3.R0)));
+#endif // #if DYNAMIC_CONFIG
   }
   Mq3.clear_calibration();
 }
