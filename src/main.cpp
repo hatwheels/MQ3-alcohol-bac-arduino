@@ -295,7 +295,6 @@ void state_main(void)
   Serial.println(mgL);
 
   dtostrf(mgL, 5, 2, str_buf);
-  Serial.println(strlen(str_buf));
   display.setCursor(8 - strlen(str_buf), 0);
   display.print(strcat(str_buf, " mg/L"));
 }
