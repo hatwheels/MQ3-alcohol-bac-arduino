@@ -35,7 +35,7 @@
  * Defines
  **************************************/
 #define EEPROM_VALID_CONFIG ((byte)'C')
-#define WARMUP_PERIOD_SEC (60*60)
+#define WARMUP_PERIOD_SEC (2*60*60)
 #define CALIBRATION_STEPS 200
 #define DYNAMIC_CONFIG false
 #if !DYNAMIC_CONFIG
@@ -294,8 +294,8 @@ void state_main(void)
   Serial.print("  |  mg/L = ");
   Serial.println(mgL);
 
-  dtostrf(mgL, 5, 2, str_buf);
-  display.setCursor(8 - strlen(str_buf), 0);
+  dtostrf(mgL, 8, 2, str_buf);
+  display.setCursor(0, 0);
   display.print(strcat(str_buf, " mg/L"));
 }
 
