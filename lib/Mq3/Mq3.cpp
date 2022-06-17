@@ -37,17 +37,17 @@ void MQ3::measure(void)
   if (this->_ain_pin == -1)
     return;
 
-  float sum = 0;
+  uint32_t sum = 0;
 
-  for (uint8_t x = 0 ; x < 100 ; x++)
+  for (uint16_t x = 0 ; x < 1000 ; x++)
     sum += analogRead(this->_ain_pin);
 
-  this->_meas.avalue = sum / 100;
-  this->_meas.volts = this->_meas.avalue / 1024 * 5.0;
+  this->_meas.avalue = sum / 1000;
+  this->_meas.volts = this->_meas.avalue / 1024.0 * 5.0;
   this->_meas.RS = ((5.0 * R) / this->_meas.volts) - R;
 }
 
-void MQ3::measure(float &val, float &volts, float &ratio)
+void MQ3::measure(uint32_t &val, double &volts, double &ratio)
 {
   this->measure();
 
@@ -60,17 +60,17 @@ void MQ3::calibrate(void)
 {
   this->measure();
 
-  const float R0 = this->_meas.RS / 60.0;
+  const double R0 = this->_meas.RS / 60.0;
 
   this->_calib.n++;
   if (this->_calib.pAvalues == NULL)
-    this->_calib.pAvalues = (float *) malloc(sizeof(float) * this->_calib.n);
+    this->_calib.pAvalues = (double *) malloc(sizeof(double) * this->_calib.n);
   else
-    this->_calib.pAvalues = (float *) realloc(this->_calib.pAvalues, sizeof(float) * this->_calib.n);
+    this->_calib.pAvalues = (double *) realloc(this->_calib.pAvalues, sizeof(double) * this->_calib.n);
   this->_calib.pAvalues[this->_calib.n - 1] = R0;
 }
 
-void MQ3::calibrate(float &val, float &volts, float &r0)
+void MQ3::calibrate(uint32_t &val, double &volts, double &r0)
 {
   this->calibrate();
 
@@ -79,9 +79,9 @@ void MQ3::calibrate(float &val, float &volts, float &r0)
   r0 = this->_calib.pAvalues[this->_calib.n - 1];
 }
 
-bool MQ3::check_calibration(const float threshold)
+bool MQ3::check_calibration(const double threshold)
 {
-  float mean = 0.0, sd = 0.0;
+  double mean = 0.0, sd = 0.0;
 
   if (this->_calib.n == 0 || this->_calib.pAvalues == NULL)
     return false;
@@ -107,7 +107,7 @@ bool MQ3::check_calibration(const float threshold)
   return false;
 }
 
-bool MQ3::check_calibration(const float threshold, float &precision)
+bool MQ3::check_calibration(const double threshold, double &precision)
 {
   bool result = this->check_calibration(threshold);
 
@@ -120,7 +120,7 @@ void MQ3::clear_calibration(void)
 {
   if (this->_calib.pAvalues != NULL)
   {
-    memset(this->_calib.pAvalues, 0, sizeof(float) * this->_calib.n);
+    memset(this->_calib.pAvalues, 0, sizeof(double) * this->_calib.n);
     free(this->_calib.pAvalues);
   }
   this->_calib.n = 0;

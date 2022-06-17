@@ -33,28 +33,28 @@ class MQ3
     static const uint16_t R = 4700U;
     void init(void);
     void measure(void);
-    void measure(float &val, float &volts, float &ratio);
+    void measure(uint32_t &val, double &volts, double &ratio);
     void calibrate(void);
-    void calibrate(float &val, float &volts, float &r0);
-    bool check_calibration(const float threshold);
-    bool check_calibration(const float threshold, float &precision);
+    void calibrate(uint32_t &val, double &volts, double &r0);
+    bool check_calibration(const double threshold);
+    bool check_calibration(const double threshold, double &precision);
     void clear_calibration(void);
-    float R0 = 0.0f;
+    double R0 = 0.0f;
 
   private:
     typedef struct {
-      float avalue;
-      float volts;
-      float RS;
+      uint32_t avalue;
+      double volts;
+      double RS;
     } ST_MEAS;
     typedef struct {
       uint32_t n;
-      float * pAvalues;
-      float precision;
+      double * pAvalues;
+      double precision;
     } ST_CALIB;
     uint8_t _ain_pin = -1;
-    ST_MEAS _meas = { .avalue = 0.0f, .volts = 0.0f, .RS = 0.0f, };
-    ST_CALIB _calib = { .n = 0, .pAvalues = NULL, .precision = FLT_MAX };
+    ST_MEAS _meas = { .avalue = 0, .volts = 0.0f, .RS = 0.0f, };
+    ST_CALIB _calib = { .n = 0, .pAvalues = NULL, .precision = DBL_MAX };
 };
 
 #endif // _MQ3_H_

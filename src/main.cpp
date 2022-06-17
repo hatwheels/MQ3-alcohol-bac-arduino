@@ -37,7 +37,10 @@
 #define EEPROM_VALID_CONFIG ((byte)'C')
 #define WARMUP_PERIOD_SEC (60*60)
 #define CALIBRATION_STEPS 200
-#define DYNAMIC_CONFIG 0
+#define DYNAMIC_CONFIG false
+#if !DYNAMIC_CONFIG
+  #define PREFCONFIG_R0 120.0
+#endif
 
 /**************************************
  * Typedefs
@@ -116,24 +119,33 @@ void state_initWarmUp(void)
 void state_runWarmUp(void)
 {
   const int16_t timer = Fsm.get_current_steps() - 1;
-  const unsigned int seconds = timer % 60;
-  const unsigned int minutes = ((timer - seconds) / 60);
-  char str_minutes[7] = {'\0'};
+  const int16_t hours = timer / 3600;
+  const int16_t minutes = (timer - hours * 3600) / 60;
+  const int16_t seconds = timer - hours * 3600 - minutes * 60;
+  char str_hours[3] = {'\0'};
+  char str_minutes[3] = {'\0'};
   char str_seconds[3] = {'\0'};
 
-  sprintf(str_minutes, "%6d", minutes);
+  sprintf(str_hours, "%02d", hours);
+  sprintf(str_minutes, "%02d", minutes);
   sprintf(str_seconds, "%02d", seconds);
 
   Serial.print(String(millis()/1000) + "  |  ");
+  Serial.print(str_hours);
+  Serial.print(':');
   Serial.print(str_minutes);
   Serial.print(':');
   Serial.println(str_seconds);
 
-  display.setCursor(7 - strlen(str_minutes),1);
-  display.print(str_minutes);
-  display.setCursor(7,1);
+  display.setCursor(4,1);
+  display.print(str_hours);
+  display.setCursor(6,1);
   display.print(":");
-  display.setCursor(8,1);
+  display.setCursor(7,1);
+  display.print(str_minutes);
+  display.setCursor(9,1);
+  display.print(":");
+  display.setCursor(10,1);
   display.print(str_seconds);
 }
 
@@ -141,7 +153,7 @@ void state_config(void)
 {
   if (EEPROM.read(0) == EEPROM_VALID_CONFIG)
   {
-    float precision;
+    double precision;
 
     EEPROM.get(1, Mq3.R0);
     EEPROM.get(1 + sizeof(Mq3.R0), precision);
@@ -165,7 +177,7 @@ void state_config(void)
 
     Fsm.set_alt_transition();
 #else
-    Mq3.R0 = 180.0;
+    Mq3.R0 = PREFCONFIG_R0;
 
     EEPROM.write(0, EEPROM_VALID_CONFIG);
     EEPROM.put(1, Mq3.R0);
@@ -186,10 +198,11 @@ void state_calibrate(void)
 {
   const char msg[] = "Calibrating... Keep MQ3 in clean air! ";
   char str_buf[17] = {0};
-  const uint16_t step = 201 - Fsm.get_current_steps();
+  const uint16_t step = CALIBRATION_STEPS - Fsm.get_current_steps() + 1;
   const uint8_t id = (step - 1) % sizeof(msg);
   const uint8_t split_len = sizeof(msg) - id - 1;
-  float val, volts, r0;
+  uint32_t val;
+  double volts, r0;
 
   Mq3.calibrate(val, volts, r0);
 
@@ -229,7 +242,7 @@ void state_calibrate(void)
 
 void state_verify(void)
 {
-  float precision;
+  double precision;
 
   Serial.print(String(millis()/1000) + "  |  ");
 
@@ -265,12 +278,13 @@ void state_verify(void)
 
 void state_main(void)
 {
-  float val, volts, ratio;
+  uint32_t val;
+  double volts, ratio;
 
   Mq3.measure(val, volts, ratio);
 
-  const float mgL = pow(0.4 * ratio, -1.431);
-  char str_buf[7] = {0};
+  const double mgL = pow(0.4 * ratio, -1.431);
+  char str_buf[16] = {0};
 
   Serial.print(String(millis()/1000) + "  |  ");
   Serial.print("Sensor value = ");
@@ -278,12 +292,11 @@ void state_main(void)
   Serial.print("  |  sensor_volt = ");
   Serial.print(volts);
   Serial.print("  |  mg/L = ");
-  Serial.print(mgL);
-  Serial.print("  |  ppm = ");
-  Serial.println(mgL * 0.0001);
+  Serial.println(mgL);
 
-  sprintf(str_buf, "%6lu", round(mgL));
-  display.setCursor(7 - strlen(str_buf), 0);
+  dtostrf(mgL, 5, 2, str_buf);
+  Serial.println(strlen(str_buf));
+  display.setCursor(8 - strlen(str_buf), 0);
   display.print(strcat(str_buf, " mg/L"));
 }
 
