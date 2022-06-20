@@ -1,5 +1,5 @@
 /********************************************************************************
- * @file    main.ino
+ * @file    main.cpp
  * @author  Kostas Markostamos
  * @date    31/03/2022
  * @brief   Main Arduino program file.
@@ -35,12 +35,10 @@
  * Defines
  **************************************/
 #define EEPROM_VALID_CONFIG ((byte)'C')
-#define WARMUP_PERIOD_SEC (2*60*60)
+#define WARMUP_PERIOD_SEC (24*60*60)
 #define CALIBRATION_STEPS 200
 #define DYNAMIC_CONFIG false
-#if !DYNAMIC_CONFIG
-  #define PREFCONFIG_R0 120.0
-#endif
+#define DEFAULT_CONFIG_R0 120.0
 
 /**************************************
  * Typedefs
@@ -151,46 +149,48 @@ void state_runWarmUp(void)
 
 void state_config(void)
 {
+  Serial.print(String(millis()/1000) + "  |  ");
+
   if (EEPROM.read(0) == EEPROM_VALID_CONFIG)
   {
-    double precision;
-
     EEPROM.get(1, Mq3.R0);
-    EEPROM.get(1 + sizeof(Mq3.R0), precision);
+    if (Mq3.is_valid())
+    {
+      double precision;
 
-    Serial.print(String(millis()/1000) + "  |  ");
-    Serial.println("Loaded Configuration  |  [R0 = " + String(Mq3.R0, 2) + "] with precision " + String(precision, 2));
+      EEPROM.get(1 + sizeof(Mq3.R0), precision);
 
-    display.setCursor(1,0);
-    display.print("Loaded Config.");
-    display.setCursor(0,1);
-    display.print("R0: " + String(round(Mq3.R0)) + " E: " + String(precision, 2) + "%");
-  }
-  else
-  {
-#if DYNAMIC_CONFIG
-    Serial.print(String(millis()/1000) + "  |  ");
-    Serial.println("No configuration found");
+      Serial.println("Loaded Configuration  |  [R0 = " + String(Mq3.R0, 2) + "] with precision " + String(precision, 2));
 
+      display.setCursor(1,0);
+      display.print("Loaded Config.");
+      display.setCursor(0,1);
+      display.print("R0: " + String(round(Mq3.R0)) + " E: " + String(precision, 2) + "%");
+
+      return;
+    }
+    Serial.println("Loaded configuration is invalid");
     display.setCursor(0,0);
-    display.print("No config. found");
-
-    Fsm.set_alt_transition();
-#else
-    Mq3.R0 = PREFCONFIG_R0;
-
-    EEPROM.write(0, EEPROM_VALID_CONFIG);
-    EEPROM.put(1, Mq3.R0);
-    EEPROM.put(1 + sizeof(Mq3.R0), 0.0f);
-
-    Serial.print(String(millis()/1000) + "  |  ");
-    Serial.println("Set static configuration  | [R0 = " + String(Mq3.R0, 2) + "]");
-    display.setCursor(2,0);
-    display.print("Set config.:");
-    display.setCursor(4,1);
-    display.print("R0: " + String(round(Mq3.R0)));
-#endif // #if DYNAMIC_CONFIG
+    display.print("Config. invalid");
   }
+#if DYNAMIC_CONFIG
+  Serial.println("No configuration found");
+
+  display.setCursor(0,1);
+  display.print("No config. found");
+
+  Fsm.set_alt_transition();
+#else
+  Mq3.R0 = DEFAULT_CONFIG_R0;
+
+  EEPROM.write(0, EEPROM_VALID_CONFIG);
+  EEPROM.put(1, Mq3.R0);
+  EEPROM.put(1 + sizeof(Mq3.R0), .0);
+
+  Serial.println("Set static configuration  | [R0 = " + String(Mq3.R0, 2) + "]");
+  display.setCursor(2,1);
+  display.print("Set R0: " + String(round(Mq3.R0)));
+#endif
   Mq3.clear_calibration();
 }
 
@@ -246,7 +246,7 @@ void state_verify(void)
 
   Serial.print(String(millis()/1000) + "  |  ");
 
-  if (Mq3.check_calibration(1.0f, precision))
+  if (Mq3.check_calibration(1.0, precision))
   {
     EEPROM.write(0, EEPROM_VALID_CONFIG);
     EEPROM.put(1, Mq3.R0);
@@ -279,12 +279,12 @@ void state_verify(void)
 void state_main(void)
 {
   uint32_t val;
-  double volts, ratio;
-
-  Mq3.measure(val, volts, ratio);
-
-  const double mgL = pow(0.4 * ratio, -1.431);
+  double volts, rs;
   char str_buf[16] = {0};
+
+  Mq3.measure(val, volts, rs);
+
+  const double mgL = pow(0.4 * rs / Mq3.R0, -1.431);
 
   Serial.print(String(millis()/1000) + "  |  ");
   Serial.print("Sensor value = ");
@@ -292,9 +292,9 @@ void state_main(void)
   Serial.print("  |  sensor_volt = ");
   Serial.print(volts);
   Serial.print("  |  mg/L = ");
-  Serial.println(mgL);
+  Serial.println(mgL, 4);
 
-  dtostrf(mgL, 8, 2, str_buf);
+  dtostrf(mgL, 8, 4, str_buf);
   display.setCursor(0, 0);
   display.print(strcat(str_buf, " mg/L"));
 }
