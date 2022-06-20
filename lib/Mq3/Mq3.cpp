@@ -58,7 +58,7 @@ void MQ3::measure(uint32_t &val, double &volts, double &rs)
 
 bool MQ3::is_valid(const double r0)
 {
-  if (r0 > .0 && r0 < 1000.0)
+  if (r0 > 300.0 && r0 < 4000.0) // corresponds to ~[1.0V ... 0.1V]
     return true;
   return false;
 }
