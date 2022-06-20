@@ -81,7 +81,7 @@ uint32_t TFSM::get_current_cycle(void)
   return this->_state.cycle;
 }
 
-int16_t TFSM::get_current_steps(void)
+int32_t TFSM::get_current_steps(void)
 {
   return this->_state.steps;
 }
@@ -89,4 +89,14 @@ int16_t TFSM::get_current_steps(void)
 void TFSM::set_alt_transition(void)
 {
   this->_alt_transition = true;
+}
+
+void TFSM::force_transition(void)
+{
+  this->_state.steps = 0;
+}
+
+void TFSM::set_delay(int16_t delay)
+{
+  this->_state.delay = delay;
 }

@@ -67,7 +67,7 @@ class TFSM
     typedef void (*state_fp)(void);
     typedef struct {
       uint32_t cycle;
-      int16_t steps;
+      int32_t steps;
       int16_t delay;
       uint8_t primary_transition;
       uint8_t alternate_transition;
@@ -78,11 +78,12 @@ class TFSM
     ~TFSM();
     void init(void);
     void init(ST_STATE state);
-    void transition(void);
     void run(void);
     uint32_t get_current_cycle(void);
-    int16_t get_current_steps(void);
+    int32_t get_current_steps(void);
     void set_alt_transition(void);
+    void force_transition(void);
+    void set_delay(int16_t delay);
 
   private:
     ST_STATE *_pStates;
