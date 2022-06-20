@@ -35,10 +35,9 @@
  * Defines
  **************************************/
 #define EEPROM_VALID_CONFIG ((byte)'C')
-#define WARMUP_PERIOD_SEC (24*60*60)
+// At least 24h pre-heat time required
+#define WARMUP_PERIOD_SEC (24*60*60L)
 #define CALIBRATION_STEPS 200
-#define DYNAMIC_CONFIG false
-#define DEFAULT_CONFIG_R0 120.0
 
 /**************************************
  * Typedefs
@@ -108,23 +107,23 @@ void delay_cb(void)
 void state_initWarmUp(void)
 {
   Serial.print(String(millis()/1000) + "  |  ");
-  Serial.println("Warming up...");
+  Serial.println("Warming up");
 
-  display.setCursor(1,0);
-  display.print("Warming up...");
+  display.setCursor(0,0);
+  display.print("Warming up");
 }
 
 void state_runWarmUp(void)
 {
-  const int16_t timer = Fsm.get_current_steps() - 1;
-  const int16_t hours = timer / 3600;
+  const int32_t timer = Fsm.get_current_steps() - 1;
+  const int32_t hours = timer / 3600;
   const int16_t minutes = (timer - hours * 3600) / 60;
   const int16_t seconds = timer - hours * 3600 - minutes * 60;
   char str_hours[3] = {'\0'};
   char str_minutes[3] = {'\0'};
   char str_seconds[3] = {'\0'};
 
-  sprintf(str_hours, "%02d", hours);
+  sprintf(str_hours, "%02ld", hours);
   sprintf(str_minutes, "%02d", minutes);
   sprintf(str_seconds, "%02d", seconds);
 
@@ -145,6 +144,38 @@ void state_runWarmUp(void)
   display.print(":");
   display.setCursor(10,1);
   display.print(str_seconds);
+
+  if (timer % 10 == 9)
+  {
+    uint32_t value;
+    double volts, rs;
+    char str_buf[16] = {'\0'};
+
+    Mq3.measure(value, volts, rs);
+
+    dtostrf(volts, 4, 2, str_buf);
+    strcat(str_buf, "V");
+
+    Serial.print(String(millis()/1000) + "  |  ");
+
+    if (volts < .61)
+    {
+      const char msg[] = "Warmup OK";
+
+      Serial.print(msg);
+      Serial.print(' ');
+
+      display.setCursor(0,0);
+      display.print(msg);
+
+      Fsm.set_delay(3);
+      Fsm.force_transition();
+    }
+    Serial.println(volts);
+
+    display.setCursor(11,0);
+    display.print(str_buf);
+  }
 }
 
 void state_config(void)
@@ -173,24 +204,13 @@ void state_config(void)
     display.setCursor(0,0);
     display.print("Config. invalid");
   }
-#if DYNAMIC_CONFIG
   Serial.println("No configuration found");
 
   display.setCursor(0,1);
   display.print("No config. found");
 
   Fsm.set_alt_transition();
-#else
-  Mq3.R0 = DEFAULT_CONFIG_R0;
 
-  EEPROM.write(0, EEPROM_VALID_CONFIG);
-  EEPROM.put(1, Mq3.R0);
-  EEPROM.put(1 + sizeof(Mq3.R0), .0);
-
-  Serial.println("Set static configuration  | [R0 = " + String(Mq3.R0, 2) + "]");
-  display.setCursor(2,1);
-  display.print("Set R0: " + String(round(Mq3.R0)));
-#endif
   Mq3.clear_calibration();
 }
 
@@ -198,7 +218,7 @@ void state_calibrate(void)
 {
   const char msg[] = "Calibrating... Keep MQ3 in clean air! ";
   char str_buf[17] = {0};
-  const uint16_t step = CALIBRATION_STEPS - Fsm.get_current_steps() + 1;
+  const int32_t step = CALIBRATION_STEPS - Fsm.get_current_steps() + 1;
   const uint8_t id = (step - 1) % sizeof(msg);
   const uint8_t split_len = sizeof(msg) - id - 1;
   uint32_t val;
@@ -235,7 +255,7 @@ void state_calibrate(void)
   }
   sprintf(str_buf, "R0: %ld", round(r0));
   memset(&str_buf[strlen(str_buf)], (int)' ', 9 - strlen(str_buf));
-  sprintf(&str_buf[9], "%3d/200", step);
+  sprintf(&str_buf[9], "%3ld/200", step);
   display.setCursor(0,1);
   display.print(str_buf);
 }
@@ -250,7 +270,7 @@ void state_verify(void)
   {
     EEPROM.write(0, EEPROM_VALID_CONFIG);
     EEPROM.put(1, Mq3.R0);
-    EEPROM.put(2, precision);
+    EEPROM.put(1 + sizeof(Mq3.R0), precision);
 
     Serial.print("Calibrated " + String(precision, 2) + "%  |  ");
     Serial.println("[R0 = " + String(Mq3.R0, 2) + "]");
@@ -292,10 +312,10 @@ void state_main(void)
   Serial.print("  |  sensor_volt = ");
   Serial.print(volts);
   Serial.print("  |  mg/L = ");
-  Serial.println(mgL, 4);
+  Serial.println(mgL, 3);
 
-  dtostrf(mgL, 8, 4, str_buf);
-  display.setCursor(0, 0);
+  dtostrf(mgL, 4, 2, str_buf);
+  display.setCursor(4, 0);
   display.print(strcat(str_buf, " mg/L"));
 }
 
