@@ -33,13 +33,15 @@ class MQ3
     static const uint16_t R = 4700U;
     void init(void);
     void measure(void);
-    void measure(uint32_t &val, double &volts, double &ratio);
+    void measure(uint32_t &val, double &volts, double &rs);
+    bool is_valid(void);
+    bool is_valid(const double r0);
     void calibrate(void);
     void calibrate(uint32_t &val, double &volts, double &r0);
     bool check_calibration(const double threshold);
     bool check_calibration(const double threshold, double &precision);
     void clear_calibration(void);
-    double R0 = 0.0f;
+    double R0 = .0;
 
   private:
     typedef struct {
@@ -53,7 +55,7 @@ class MQ3
       double precision;
     } ST_CALIB;
     uint8_t _ain_pin = -1;
-    ST_MEAS _meas = { .avalue = 0, .volts = 0.0f, .RS = 0.0f, };
+    ST_MEAS _meas = { .avalue = 0, .volts = .0, .RS = .0, };
     ST_CALIB _calib = { .n = 0, .pAvalues = NULL, .precision = DBL_MAX };
 };
 

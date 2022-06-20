@@ -47,13 +47,25 @@ void MQ3::measure(void)
   this->_meas.RS = ((5.0 * R) / this->_meas.volts) - R;
 }
 
-void MQ3::measure(uint32_t &val, double &volts, double &ratio)
+void MQ3::measure(uint32_t &val, double &volts, double &rs)
 {
   this->measure();
 
   val = this->_meas.avalue;
   volts = this->_meas.volts;
-  ratio = (this->R0 != 0.0f) ? (this->_meas.RS / this->R0) : 0.0f;
+  rs = this->_meas.RS;
+}
+
+bool MQ3::is_valid(const double r0)
+{
+  if (r0 > .0 && r0 < 1000.0)
+    return true;
+  return false;
+}
+
+bool MQ3::is_valid(void)
+{
+  return is_valid(this->R0);
 }
 
 void MQ3::calibrate(void)
@@ -81,7 +93,7 @@ void MQ3::calibrate(uint32_t &val, double &volts, double &r0)
 
 bool MQ3::check_calibration(const double threshold)
 {
-  double mean = 0.0, sd = 0.0;
+  double mean = .0, sd = .0;
 
   if (this->_calib.n == 0 || this->_calib.pAvalues == NULL)
     return false;
@@ -89,6 +101,9 @@ bool MQ3::check_calibration(const double threshold)
   for (uint16_t i = 0; i < this->_calib.n; i++)
     mean += this->_calib.pAvalues[i];
   mean /= this->_calib.n;
+
+  if (!this->is_valid(mean))
+    return false;
 
   for (uint16_t i = 0; i < this->_calib.n; i++)
     sd += pow(this->_calib.pAvalues[i] - mean, 2);
