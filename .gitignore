@@ -5,3 +5,5 @@
 .vscode/extensions.json
 .vscode/ipch
 *.ino_bkp
+*.txt
+
