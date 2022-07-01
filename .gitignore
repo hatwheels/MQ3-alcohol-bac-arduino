@@ -6,4 +6,5 @@
 .vscode/ipch
 *.ino_bkp
 *.txt
+*.code-workspace
 
