@@ -15,8 +15,6 @@
  *          Information about the project will be written in the README.
  * 
  *          TODO: - Comment state action functions.
- *                - Eventually keep only core programm process in main file and
- *                  move the rest in appropriate header, source files.
 ********************************************************************************/
 
 
@@ -52,36 +50,50 @@ typedef enum {
   STATE_RESET,
 } E_STATE;
 
+typedef enum {
+  E_ERROR_MSG_GENERIC = 0,
+  E_ERROR_MSG_MQ3,
+  E_ERROR_MSG_TOTAL
+} E_ERROR_MSG;
+
 /**************************************
  * State action functions prototypes
  **************************************/
 void delay_cb(void);
-void state_initWarmUp(void);
-void state_runWarmUp(void);
-void state_config(void);
-void state_calibrate(void);
-void state_verify(void);
-void state_main(void);
-void state_reset(void);
+void state_initWarmUp(void* arg);
+void state_runWarmUp(void* arg);
+void state_config(void* arg);
+void state_calibrate(void* arg);
+void state_verify(void* arg);
+void state_main(void* arg);
+void state_reset(void* arg);
+
+/**************************************
+ * Constants
+ **************************************/
+const char error_msg[E_ERROR_MSG_TOTAL][33] = {
+  "Unexpected error  Resetting...  ",
+  "Error, check MQ3 Resetting soon "
+  };
 
 /**************************************
  * Variables
  **************************************/
-TFSM::ST_STATE state_table[] = { // cycle, steps, delay, primary_transition, alternate_transition, action, delay_cb
+TFSM::ST_STATE state_table[] = { // cycle, steps, delay, primary_transition, alternate_transition, action, action_arg, delay_cb
   // STATE_INIT_WARMUP
-  {0, 1, 0, STATE_RUN_WARMUP, STATE_RESET, state_initWarmUp, NULL},
+  {0, 1, 0, STATE_RUN_WARMUP, STATE_RESET, state_initWarmUp, NULL, NULL},
   // STATE_RUN_WARMUP
-  {1000, WARMUP_PERIOD_SEC+1, 1, STATE_CONFIG, STATE_RESET, state_runWarmUp, delay_cb},
+  {1000, WARMUP_PERIOD_SEC+1, 1, STATE_CONFIG, STATE_RESET, state_runWarmUp, NULL, delay_cb},
   // STATE_CONFIG
-  {1000, 1, 4, STATE_MAIN, STATE_CALIBRATE, state_config, delay_cb},
+  {1000, 1, 4, STATE_MAIN, STATE_CALIBRATE, state_config, NULL, delay_cb},
   // STATE_CALIBRATE
-  {1000, CALIBRATION_STEPS, 1, STATE_VERIFY, STATE_RESET, state_calibrate, delay_cb},
+  {1000, CALIBRATION_STEPS, 1, STATE_VERIFY, STATE_RESET, state_calibrate, NULL, delay_cb},
   // STATE_VERIFY
-  {1000, 1, 1, STATE_MAIN, STATE_CONFIG, state_verify, delay_cb},
+  {1000, 1, 1, STATE_MAIN, STATE_CONFIG, state_verify, NULL, delay_cb},
   // STATE_MAIN
-  {1000, 1, 0, STATE_MAIN, STATE_RESET, state_main, NULL},
+  {1000, 1, 0, STATE_MAIN, STATE_RESET, state_main, NULL, NULL},
   // STATE_RESET
-  {UINT32_MAX, 1, 0, STATE_RESET, STATE_RESET, state_reset, NULL}
+  {UINT32_MAX, 1, 0, STATE_RESET, STATE_RESET, state_reset, (void *) error_msg[E_ERROR_MSG_GENERIC], NULL}
 };
 uint32_t time = 0;
 
@@ -104,8 +116,10 @@ void delay_cb(void)
   display.clear();
 }
 
-void state_initWarmUp(void)
+void state_initWarmUp(void* arg)
 {
+  (void) arg;
+
   Serial.print(String(millis()/1000) + "  |  ");
   Serial.println("Warming up");
 
@@ -113,7 +127,7 @@ void state_initWarmUp(void)
   display.print("Warming up");
 }
 
-void state_runWarmUp(void)
+void state_runWarmUp(void* arg)
 {
   const int32_t timer = Fsm.get_current_steps() - 1;
   const int32_t hours = timer / 3600;
@@ -122,12 +136,15 @@ void state_runWarmUp(void)
   char str_hours[3] = {'\0'};
   char str_minutes[3] = {'\0'};
   char str_seconds[3] = {'\0'};
+  const String timestamp = String(millis()/1000);
+
+  (void) arg;
 
   sprintf(str_hours, "%02ld", hours);
   sprintf(str_minutes, "%02d", minutes);
   sprintf(str_seconds, "%02d", seconds);
 
-  Serial.print(String(millis()/1000) + "  |  ");
+  Serial.print(timestamp + "  |  ");
   Serial.print(str_hours);
   Serial.print(':');
   Serial.print(str_minutes);
@@ -149,37 +166,45 @@ void state_runWarmUp(void)
   {
     uint32_t value;
     double volts, rs;
-    char str_buf[16] = {'\0'};
 
-    Mq3.measure(value, volts, rs);
+    Serial.print(timestamp + "  |  ");
 
-    dtostrf(volts, 4, 2, str_buf);
-    strcat(str_buf, "V");
-
-    Serial.print(String(millis()/1000) + "  |  ");
-
-    if (volts < .61)
+    if (Mq3.measure(value, volts, rs))
     {
-      const char msg[] = "Warmup OK";
+      char str_buf[16] = {'\0'};
 
-      Serial.print(msg);
-      Serial.print(' ');
+      if (volts < .61)
+      {
+        const char msg[] = "Warmup OK ";
 
-      display.setCursor(0,0);
-      display.print(msg);
+        Serial.print(msg);
+        Serial.print(' ');
 
-      Fsm.set_delay(3);
-      Fsm.force_transition();
+        display.setCursor(0,0);
+        display.print(msg);
+
+        Fsm.set_all(false, 3, true);
+      }
+      Serial.print(volts);
+      Serial.println("V");
+
+      dtostrf(volts, 3, 1, str_buf);
+      strcat(str_buf, "V");
+
+      display.setCursor(11,0);
+      display.print(str_buf);
     }
-    Serial.println(volts);
-
-    display.setCursor(11,0);
-    display.print(str_buf);
+    else
+    {
+      Fsm.set_all(true, 0, true, error_msg[E_ERROR_MSG_MQ3]);
+    }
   }
 }
 
-void state_config(void)
+void state_config(void* arg)
 {
+  (void) arg;
+
   Serial.print(String(millis()/1000) + "  |  ");
 
   if (EEPROM.read(0) == EEPROM_VALID_CONFIG)
@@ -214,55 +239,67 @@ void state_config(void)
   Mq3.clear_calibration();
 }
 
-void state_calibrate(void)
+void state_calibrate(void* arg)
 {
-  const char msg[] = "Calibrating... Keep MQ3 in clean air! ";
-  char str_buf[17] = {0};
-  const int32_t step = CALIBRATION_STEPS - Fsm.get_current_steps() + 1;
-  const uint8_t id = (step - 1) % sizeof(msg);
-  const uint8_t split_len = sizeof(msg) - id - 1;
   uint32_t val;
   double volts, r0;
 
-  Mq3.calibrate(val, volts, r0);
+  (void) arg;
 
-  Serial.print(String(millis()/1000) + "  |  ");
-  Serial.println(msg);
-  Serial.print("Sensor value = ");
-  Serial.print(val);
-  Serial.print("  |  ");
-  Serial.print("sensor volts = ");
-  Serial.print(volts);
-  Serial.print("V  |  calib R0 = ");
-  Serial.print(r0);
-  Serial.print(" | Step = ");
-  Serial.println(step);
-
-  display.setCursor(0,0);
-  if (split_len > 15)
+  if (Mq3.calibrate(val, volts, r0))
   {
-    strncpy(str_buf, &msg[id], 16);
+    const char msg[] = "Calibrating... Keep MQ3 in clean air! ";
+    char str_buf[17] = {0};
+    const int32_t step = CALIBRATION_STEPS - Fsm.get_current_steps() + 1;
+    const uint8_t id = (step - 1) % sizeof(msg);
+    const uint8_t split_len = sizeof(msg) - id - 1;
+
+    Serial.print(String(millis()/1000) + "  |  ");
+    Serial.println(msg);
+    Serial.print("Sensor value = ");
+    Serial.print(val);
+    Serial.print("  |  ");
+    Serial.print("sensor volts = ");
+    Serial.print(volts);
+    Serial.print("V  |  calib R0 = ");
+    Serial.print(r0);
+    Serial.print(" | Step = ");
+    Serial.println(step);
+
+    if (split_len > 15)
+    {
+      strncpy(str_buf, &msg[id], 16);
+      display.setCursor(0,0);
+      display.print(str_buf);
+    }
+    else
+    {
+      strncpy(str_buf, &msg[id], split_len);
+      display.setCursor(0,0);
+      display.print(str_buf);
+
+      strncpy(str_buf, msg, 16 - split_len);
+      str_buf[16 - split_len] = '\0';
+      display.setCursor(split_len, 0);
+      display.print(str_buf);
+    }
+    sprintf(str_buf, "R0: %ld", round(r0));
+    memset(&str_buf[strlen(str_buf)], (int)' ', 9 - strlen(str_buf));
+    sprintf(&str_buf[9], "%3ld/200", step);
+    display.setCursor(0,1);
     display.print(str_buf);
   }
   else
   {
-    strncpy(str_buf, &msg[id], split_len);
-    display.print(str_buf);
-    display.setCursor(split_len, 0);
-    strncpy(str_buf, msg, 16 - split_len);
-    str_buf[16 - split_len] = '\0';
-    display.print(str_buf);
+    Fsm.set_all(true, 0, true, error_msg[E_ERROR_MSG_MQ3]);
   }
-  sprintf(str_buf, "R0: %ld", round(r0));
-  memset(&str_buf[strlen(str_buf)], (int)' ', 9 - strlen(str_buf));
-  sprintf(&str_buf[9], "%3ld/200", step);
-  display.setCursor(0,1);
-  display.print(str_buf);
 }
 
-void state_verify(void)
+void state_verify(void* arg)
 {
   double precision;
+
+  (void) arg;
 
   Serial.print(String(millis()/1000) + "  |  ");
 
@@ -296,38 +333,50 @@ void state_verify(void)
   }
 }
 
-void state_main(void)
+void state_main(void* arg)
 {
   uint32_t val;
   double volts, rs;
-  char str_buf[16] = {0};
 
-  Mq3.measure(val, volts, rs);
+  (void) arg;
 
-  const double mgL = pow(0.4 * rs / Mq3.R0, -1.431);
+  if (Mq3.measure(val, volts, rs))
+  {
+    char str_buf[16] = {0};
+    const double mgL = pow(0.4 * rs / Mq3.R0, -1.431);
 
-  Serial.print(String(millis()/1000) + "  |  ");
-  Serial.print("Sensor value = ");
-  Serial.print(val);
-  Serial.print("  |  sensor_volt = ");
-  Serial.print(volts);
-  Serial.print("  |  mg/L = ");
-  Serial.println(mgL, 3);
+    Serial.print(String(millis()/1000) + "  |  ");
+    Serial.print("Sensor value = ");
+    Serial.print(val);
+    Serial.print("  |  sensor_volt = ");
+    Serial.print(volts);
+    Serial.print("  |  mg/L = ");
+    Serial.print(mgL, 3);
 
-  dtostrf(mgL, 4, 2, str_buf);
-  display.setCursor(4, 0);
-  display.print(strcat(str_buf, " mg/L"));
+    dtostrf(mgL, 8, 2, str_buf);
+    display.setCursor(0, 0);
+    display.print(strcat(str_buf, " mg/L"));
+  }
+  else
+  {
+    Fsm.set_all(true, 0, true, "Error, check MQ3 Resetting soon ");
+  }
 }
 
-void state_reset(void)
+void state_reset(void* arg)
 {
   Serial.print(String(millis()/1000) + "  |  ");
   Serial.println("Unexpected error occured, resetting when watchdog expires...");
 
-  display.setCursor(0,0);
-  display.print("Unexpected error");
-  display.setCursor(2,1);
-  display.print("Resetting...");
+  if (arg != NULL)
+  {
+    const char *msg = (const char *) arg;
+
+    display.setCursor(0,0);
+    display.print(msg);
+    display.setCursor(0,1);
+    display.print(&msg[16]);
+  }
 }
 
 
