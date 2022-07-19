@@ -2,5 +2,6 @@
 .vscode
 *.ino_bkp
 *.txt
+platformio-device-monitor*.log
 
 
