@@ -32,12 +32,12 @@ class MQ3
     ~MQ3();
     static const uint16_t R = 4700U;
     void init(void);
-    void measure(void);
-    void measure(uint32_t &val, double &volts, double &rs);
+    bool measure(void);
+    bool measure(uint32_t &val, double &volts, double &rs);
     bool is_valid(void);
     bool is_valid(const double r0);
-    void calibrate(void);
-    void calibrate(uint32_t &val, double &volts, double &r0);
+    bool calibrate(void);
+    bool calibrate(uint32_t &val, double &volts, double &r0);
     bool check_calibration(const double threshold);
     bool check_calibration(const double threshold, double &precision);
     void clear_calibration(void);

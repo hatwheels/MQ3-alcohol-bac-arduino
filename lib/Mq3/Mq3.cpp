@@ -32,35 +32,48 @@ void MQ3::init(void)
   pinMode(this->_ain_pin, INPUT);
 }
 
-void MQ3::measure(void)
+bool MQ3::measure(void)
 {
   if (this->_ain_pin == -1)
-    return;
+  {
+    return false;
+  }
 
   uint32_t sum = 0;
 
   for (uint16_t x = 0 ; x < 1000 ; x++)
     sum += analogRead(this->_ain_pin);
 
+  if (0 == sum)
+  {
+    return false;
+  }
+
   this->_meas.avalue = sum / 1000;
   this->_meas.volts = this->_meas.avalue / 1024.0 * 5.0;
   this->_meas.RS = ((5.0 * R) / this->_meas.volts) - R;
+
+  return true;
 }
 
-void MQ3::measure(uint32_t &val, double &volts, double &rs)
+bool MQ3::measure(uint32_t &val, double &volts, double &rs)
 {
-  this->measure();
+  if (this->measure())
+  {
+    val = this->_meas.avalue;
+    volts = this->_meas.volts;
+    rs = this->_meas.RS;
 
-  val = this->_meas.avalue;
-  volts = this->_meas.volts;
-  rs = this->_meas.RS;
+    return true;
+  }
+
+  return false;
 }
 
 bool MQ3::is_valid(const double r0)
 {
-  if (r0 > 300.0 && r0 < 4000.0) // corresponds to ~[1.0V ... 0.1V]
-    return true;
-  return false;
+  // corresponds to ~[1.0V ... 0.1V]
+  return (r0 > 300.0 && r0 < 4000.0) ? true : false;
 }
 
 bool MQ3::is_valid(void)
@@ -68,35 +81,45 @@ bool MQ3::is_valid(void)
   return is_valid(this->R0);
 }
 
-void MQ3::calibrate(void)
+bool MQ3::calibrate(void)
 {
-  this->measure();
+  if (this->measure())
+  {
+    const double R0 = this->_meas.RS / 60.0;
 
-  const double R0 = this->_meas.RS / 60.0;
+    this->_calib.n++;
+    if (this->_calib.pAvalues == NULL)
+      this->_calib.pAvalues = (double *) malloc(sizeof(double) * this->_calib.n);
+    else
+      this->_calib.pAvalues = (double *) realloc(this->_calib.pAvalues, sizeof(double) * this->_calib.n);
+    this->_calib.pAvalues[this->_calib.n - 1] = R0;
 
-  this->_calib.n++;
-  if (this->_calib.pAvalues == NULL)
-    this->_calib.pAvalues = (double *) malloc(sizeof(double) * this->_calib.n);
-  else
-    this->_calib.pAvalues = (double *) realloc(this->_calib.pAvalues, sizeof(double) * this->_calib.n);
-  this->_calib.pAvalues[this->_calib.n - 1] = R0;
+    return true;
+  }
+
+  return false;
 }
 
-void MQ3::calibrate(uint32_t &val, double &volts, double &r0)
+bool MQ3::calibrate(uint32_t &val, double &volts, double &r0)
 {
-  this->calibrate();
+  if (this->calibrate())
+  {
+    val = this->_meas.avalue;
+    volts = this->_meas.volts;
+    r0 = this->_calib.pAvalues[this->_calib.n - 1];
 
-  val = this->_meas.avalue;
-  volts = this->_meas.volts;
-  r0 = this->_calib.pAvalues[this->_calib.n - 1];
+    return true;
+  }
+
+  return false;
 }
 
 bool MQ3::check_calibration(const double threshold)
 {
-  double mean = .0, sd = .0;
-
   if (this->_calib.n == 0 || this->_calib.pAvalues == NULL)
     return false;
+
+  double mean = .0, sd = .0;
 
   for (uint16_t i = 0; i < this->_calib.n; i++)
     mean += this->_calib.pAvalues[i];
@@ -113,13 +136,12 @@ bool MQ3::check_calibration(const double threshold)
   // So calculate the error of 99.7% of the data.
   this->_calib.precision = ((3 * sd) / mean) * 100;
 
-  if (this->_calib.precision < threshold)
-  {
-    this->R0 = mean;
-    return true;
-  }
+  if (this->_calib.precision > threshold)
+    return false;
 
-  return false;
+  this->R0 = mean;
+
+  return true;
 }
 
 bool MQ3::check_calibration(const double threshold, double &precision)
