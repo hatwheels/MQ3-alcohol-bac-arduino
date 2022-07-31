@@ -173,7 +173,7 @@ void state_runWarmUp(void* arg)
     {
       char str_buf[16] = {'\0'};
 
-      if (volts < .61)
+      if (volts < .605)
       {
         const char msg[] = "Warmup OK ";
 
@@ -188,7 +188,7 @@ void state_runWarmUp(void* arg)
       Serial.print(volts);
       Serial.println("V");
 
-      dtostrf(volts, 3, 1, str_buf);
+      dtostrf(volts, 4, 2, str_buf);
       strcat(str_buf, "V");
 
       display.setCursor(11,0);
@@ -351,7 +351,7 @@ void state_main(void* arg)
     Serial.print("  |  sensor_volt = ");
     Serial.print(volts);
     Serial.print("  |  mg/L = ");
-    Serial.print(mgL, 3);
+    Serial.println(mgL, 3);
 
     dtostrf(mgL, 8, 2, str_buf);
     display.setCursor(0, 0);
