@@ -41,7 +41,7 @@ bool MQ3::measure(void)
 
   uint32_t sum = 0;
 
-  for (uint16_t x = 0 ; x < 1000 ; x++)
+  for (uint16_t x = 0; x < 1000; x++)
     sum += analogRead(this->_ain_pin);
 
   if (0 == sum)
