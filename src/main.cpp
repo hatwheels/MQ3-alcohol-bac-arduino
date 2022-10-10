@@ -32,6 +32,7 @@
 /**************************************
  * Defines
  **************************************/
+#define WDT_TIME_OFF 5
 #define EEPROM_VALID_CONFIG ((byte)'C')
 // At least 24h pre-heat time required
 #define WARMUP_PERIOD_SEC (24*60*60L)
@@ -386,15 +387,22 @@ void state_reset(void* arg)
 
 void setup(void)
 {
+  char str_line1[16] = {0};
+
   Serial.begin(9600);
 
   display.init();
   display.backlight();
 
   Mq3.init();
-
   wdt_disable();
-  delay(3000);
+  sprintf(str_line1, " WDT OFF for %ds", WDT_TIME_OFF);
+  display.setCursor(0, 0);
+  display.print(str_line1);
+  display.setCursor(0, 1);
+  display.print(" safe FW upload");
+  delay(WDT_TIME_OFF*1000);
+  display.clear();
   wdt_enable(WDTO_8S); // 8s Watchdog
 }
 
