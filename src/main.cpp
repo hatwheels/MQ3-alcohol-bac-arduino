@@ -25,6 +25,8 @@
 #include <Wire.h>
 #include <avr/wdt.h>
 #include <LiquidCrystal_I2C.h>
+#include <OneWire.h> 
+#include <DallasTemperature.h>
 #include <EEPROM.h>
 #include <Tfsm.h>
 #include <Mq3.h>
@@ -42,7 +44,8 @@
  * Typedefs
  **************************************/
 typedef enum {
-  STATE_INIT_WARMUP = 0,
+  STATE_CHECK_TEMPSENSOR = 0,
+  STATE_INIT_WARMUP,
   STATE_RUN_WARMUP,
   STATE_CONFIG,
   STATE_CALIBRATE,
@@ -61,6 +64,7 @@ typedef enum {
  * State action functions prototypes
  **************************************/
 void delay_cb(void);
+void state_check_tempsensor(void * arg);
 void state_initWarmUp(void* arg);
 void state_runWarmUp(void* arg);
 void state_config(void* arg);
@@ -81,6 +85,8 @@ const char error_msg[E_ERROR_MSG_TOTAL][33] = {
  * Variables
  **************************************/
 TFSM::ST_STATE state_table[] = { // cycle, steps, delay, primary_transition, alternate_transition, action, action_arg, delay_cb
+  // STATE_CHECK_TEMPSENSOR
+  {1000, 1, 1, STATE_INIT_WARMUP, STATE_RESET, state_check_tempsensor, NULL, delay_cb},
   // STATE_INIT_WARMUP
   {0, 1, 0, STATE_RUN_WARMUP, STATE_RESET, state_initWarmUp, NULL, NULL},
   // STATE_RUN_WARMUP
@@ -104,7 +110,28 @@ uint32_t time = 0;
 LiquidCrystal_I2C display(0x27, 20, 4);
 TFSM Fsm(state_table, sizeof(state_table) / sizeof(TFSM::ST_STATE));
 MQ3 Mq3(A3);
+// OneWire instance
+OneWire oneWire(2);
+DallasTemperature Ds18b20(&oneWire);
+// Holds Dallas Temperature sensors addresses
+DeviceAddress InsideThermometer;
 
+/***************************/
+/* Static functions        */
+/***************************/
+
+static void printAll(const char str_msg[2][16], bool newline=false)
+{
+  for (uint8_t i; i < 2; i++)
+  {
+    Serial.print(str_msg[i]);
+
+    display.setCursor(0, i);
+    display.print(str_msg[i]);
+  }
+  if (newline)
+    Serial.println();
+}
 
 /***************************/
 /* State actions Functions */
@@ -115,6 +142,50 @@ void delay_cb(void)
   Serial.print(String(millis()/1000) + "  |  ");
   Serial.println("display cleared");
   display.clear();
+}
+
+void state_check_tempsensor(void * arg)
+{
+  const uint8_t devices = Ds18b20.getDeviceCount();
+
+  (void) arg;
+
+  Serial.print(String(millis()/1000) + "  |  ");
+
+  if (devices > 0 && Ds18b20.getAddress(InsideThermometer, 0))
+  {
+    char str_buf[2][16] = { "" , "sensor found. "};
+
+    Ds18b20.setResolution(InsideThermometer, 12);
+
+    sprintf(str_buf[0], "%d Temperature ", devices);
+    printAll(str_buf);
+
+    Serial.print("Device 0 address, resolution, mode: ");
+    for (uint8_t i = 0; i < 8; i ++)
+    {
+      if (InsideThermometer[i] < 16)
+        Serial.print("0");
+      Serial.print(InsideThermometer[i], HEX);
+    }
+
+    Serial.print(", ");
+    Serial.print(Ds18b20.getResolution(InsideThermometer), DEC);
+
+    if (Ds18b20.isParasitePowerMode())
+      Serial.println(", 2-wire (parasite) mode.");
+    else
+      Serial.println(", 3-wire (normal) mode.");
+  }
+  else
+  {
+    const char str_buf[2][16] = {
+      "No temperature ",
+      "sensor found!"
+    };
+
+    printAll(str_buf, true);
+  }
 }
 
 void state_initWarmUp(void* arg)
@@ -172,7 +243,7 @@ void state_runWarmUp(void* arg)
 
     if (Mq3.measure(value, volts, rs))
     {
-      char str_buf[16] = {'\0'};
+      char str_buf[17] = {0};
 
       if (volts < .605)
       {
@@ -337,31 +408,56 @@ void state_verify(void* arg)
 void state_main(void* arg)
 {
   uint32_t val;
+  float tempC;
   double volts, rs;
+  String str_tempC = "";
+  char str_buf[2][17] = {0};
 
   (void) arg;
 
+  Serial.print(String(millis()/1000) + "  |  ");
+
+  if (Ds18b20.getDeviceCount() > 0)
+  {
+    Ds18b20.requestTemperatures();
+    if ((tempC = Ds18b20.getTempC(InsideThermometer)) == DEVICE_DISCONNECTED_C)
+    {
+      str_tempC = "Temperature sensor disconnected!  |  ";
+      sprintf(str_buf[1], "Temp. discon'ed.");
+    }
+    else
+    {
+      str_tempC = "Temperature: " + String(tempC, 1) + " °C  |  ";
+      dtostrf(tempC, 8, 1, str_buf[1]);
+    }
+  }
+
   if (Mq3.measure(val, volts, rs))
   {
-    char str_buf[16] = {0};
     const double mgL = pow(0.4 * rs / Mq3.R0, -1.431);
 
-    Serial.print(String(millis()/1000) + "  |  ");
     Serial.print("Sensor value = ");
     Serial.print(val);
     Serial.print("  |  sensor_volt = ");
     Serial.print(volts);
     Serial.print("  |  mg/L = ");
-    Serial.println(mgL, 3);
+    Serial.print(mgL, 3);
+    Serial.println(str_tempC);
 
-    dtostrf(mgL, 8, 2, str_buf);
+    dtostrf(mgL, 8, 2, str_buf[0]);
     display.setCursor(0, 0);
-    display.print(strcat(str_buf, " mg/L"));
+    display.print(strcat(str_buf[0], " mg/L"));
+    if (strlen(str_buf[1]) > 0)
+    {
+      display.setCursor(0, 1);
+      display.print(str_buf[1]);
+    }
   }
   else
   {
-    Fsm.set_all(true, 0, true, "Error, check MQ3 Resetting soon ");
+    Fsm.set_all(true, 0, true, error_msg[E_ERROR_MSG_MQ3]);
   }
+  Serial.println();
 }
 
 void state_reset(void* arg)
@@ -395,6 +491,8 @@ void setup(void)
   display.backlight();
 
   Mq3.init();
+  Ds18b20.begin();
+
   wdt_disable();
   sprintf(str_line1, " WDT OFF for %ds", WDT_TIME_OFF);
   display.setCursor(0, 0);
